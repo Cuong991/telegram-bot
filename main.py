@@ -7,8 +7,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 
 # === Config ===
 TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- thay bằng token bot của bạn
-SCREENSHOT_API = 'https://image.thum.io/get/fullpage/https://coinmarketcap.com/vi/charts/fear-and-greed-index/'
-
+SCREENSHOT_API = 'https://image.thum.io/get/width/1920/crop/1080/fullpage/https://coinmarketcap.com/vi/charts/fear-and-greed-index/'
 # === Setup logging ===
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -37,11 +36,10 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # --- Crop ảnh --- 
             # Bạn chỉnh các giá trị này nếu cần fine-tune
-            left = 60
+            left = 100
             top = 200
-            right = 1050
-            bottom = 800
-
+            right = 1820
+            bottom = 700
             cropped_img = img.crop((left, top, right, bottom))
 
             # Lưu ảnh vào bộ nhớ để gửi
