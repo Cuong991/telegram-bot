@@ -3,3 +3,4 @@ nest_asyncio
 requests
 pytz
 Pillow
+selenium
