@@ -184,5 +184,85 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f">>Chỉ số Tham lam & Sợ hãi hiện tại: 👉 <b>{value}</b>\n\n"
                     f"Thời gian: {vietnam_time}\n\n"
                     f"- <b>Trạng thái:</b> {status_text}\n\n"
-                    f"🔴 = sợ hãi tột độ\n"
-                    f"🟠
+                    "🔴 = sợ hãi tột độ\n"
+                    "🟠 = sợ hãi\n"
+                    "🔵 = trung lập\n"
+                    "🟢 = tham lam\n"
+                    "🟢⚡ = tham lam tột độ\n\n"
+                    "<b>Admin</b>: @cuong49"
+                )
+            else:
+                message = "Không thể lấy dữ liệu chỉ số. Vui lòng thử lại sau."
+
+            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
+
+        elif query.data == "check_dominance":
+            btc_dominance, altcoin_dominance = get_dominance_data()
+            if btc_dominance is not None:
+                vietnam_time = get_vietnam_time()
+
+                if altcoin_dominance < 45:
+                    season_chance = "Thấp 🔻"
+                elif 45 <= altcoin_dominance < 55:
+                    season_chance = "Trung bình ⚖️"
+                elif 55 <= altcoin_dominance < 65:
+                    season_chance = "Khả năng sắp diễn ra cao 🚀"
+                else:
+                    season_chance = "Altcoin season đang diễn ra 🌟"
+
+                message = (
+                    f">>Chỉ số Bitcoin Dominance hiện tại: 👉 <b>{btc_dominance}%</b>\n\n"
+                    f"Chỉ số Altcoin Dominance hiện tại: 👉 <b>{altcoin_dominance}%</b>\n\n"
+                    f"Thời gian: {vietnam_time}\n\n"
+                    f"Khả năng altcoin season diễn ra: <b>{season_chance}</b>\n\n"
+                    "- <b>Ghi chú:</b> Chỉ số Altcoin Dominance càng cao thì khả năng Altcoin Season càng mạnh.\n\n"
+                    "<b>Admin</b>: @cuong49"
+                )
+            else:
+                message = "Không thể lấy dữ liệu Dominance. Vui lòng thử lại sau."
+
+            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
+
+        elif query.data == "test_function":
+            vietnam_time = get_vietnam_time()
+            message = (
+                f">>Chức năng Test đang hoạt động! 🎉\n\n"
+                f"Thời gian: {vietnam_time}\n\n"
+                f"Đây là một chức năng thử nghiệm.\n\n"
+                "<b>Admin</b>: @cuong49"
+            )
+            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
+
+    except TelegramError as e:
+        logger.error(f"Lỗi trong button: {e}")
+        await context.bot.send_message(chat_id=chat_id, text="Đã xảy ra lỗi. Vui lòng thử lại sau.", parse_mode="HTML")
+
+async def main():
+    try:
+        logger.info("Khởi tạo bot với token...")
+        app = ApplicationBuilder().token(TOKEN).build()
+
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("help", help_command))
+        app.add_handler(CommandHandler("status", status))
+        app.add_handler(CallbackQueryHandler(button))
+
+        # Thêm công việc định kỳ: gửi cảnh báo mỗi 24 giờ
+        app.job_queue.run_repeating(send_fear_greed_alert, interval=24*60*60, first=10)  # Chạy sau 10 giây đầu tiên
+
+        logger.info("Bắt đầu chạy bot...")
+        await app.run_polling(allowed_updates=Update.ALL_TYPES)
+    except TelegramError as e:
+        logger.error(f"Lỗi Telegram trong main: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Lỗi khác trong main: {e}")
+        raise
+
+if __name__ == "__main__":
+    try:
+        logger.info("Áp dụng nest_asyncio và chạy bot...")
+        nest_asyncio.apply()
+        asyncio.run(main())
+    except Exception as e:
+        logger.error(f"Lỗi khi khởi động: {e}")
