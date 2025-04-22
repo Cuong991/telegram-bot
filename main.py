@@ -1,10 +1,11 @@
 import time
 import os
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
-from PIL import Image
 from io import BytesIO
+from PIL import Image
 
 # API token của bạn
 TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
@@ -13,25 +14,25 @@ TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
 def screenshot_feargreed():
     try:
         # Khởi tạo Selenium với Chrome WebDriver
-        options = webdriver.ChromeOptions()
-        options.headless = True  # Chạy ẩn không mở cửa sổ trình duyệt
-        driver = webdriver.Chrome(options=options)
+        options = Options()
+        options.add_argument("--headless")  # Chạy không giao diện
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.binary_location = '/usr/bin/chromium'  # Dùng Chrome được cài trong Docker
+
+        driver = webdriver.Chrome(executable_path="/usr/bin/chromedriver", options=options)
 
         # Truy cập trang web Fear & Greed Index
         driver.get("https://www.coinglass.com/vi/pro/i/FearGreedIndex")
         time.sleep(3)  # Đợi trang web tải xong
 
         # Lưu ảnh chụp màn hình
-        screenshot_path = "/tmp/fear_greed_screenshot.png"
-        driver.save_screenshot(screenshot_path)
+        screenshot = driver.get_screenshot_as_png()
         driver.quit()
 
-        # Kiểm tra nếu ảnh đã được lưu
-        if not os.path.exists(screenshot_path):
-            raise Exception("Không thể lưu ảnh chụp màn hình.")
-
-        # Mở ảnh đã chụp để xử lý
-        img = Image.open(screenshot_path)
+        # Mở ảnh đã chụp
+        img_byte_arr = BytesIO(screenshot)
+        img = Image.open(img_byte_arr)
         img_byte_arr = BytesIO()
         img.save(img_byte_arr, format='PNG')
         img_byte_arr.seek(0)
