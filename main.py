@@ -1,4 +1,5 @@
 import time
+import os
 from selenium import webdriver
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
@@ -10,27 +11,35 @@ TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
 
 # Hàm chụp ảnh màn hình trang web
 def screenshot_feargreed():
-    # Khởi tạo Selenium với Chrome WebDriver
-    options = webdriver.ChromeOptions()
-    options.headless = True  # Chạy ẩn không mở cửa sổ trình duyệt
-    driver = webdriver.Chrome(options=options)
+    try:
+        # Khởi tạo Selenium với Chrome WebDriver
+        options = webdriver.ChromeOptions()
+        options.headless = True  # Chạy ẩn không mở cửa sổ trình duyệt
+        driver = webdriver.Chrome(options=options)
 
-    # Truy cập trang web Fear & Greed Index
-    driver.get("https://www.coinglass.com/vi/pro/i/FearGreedIndex")
-    time.sleep(3)  # Đợi trang web tải xong
+        # Truy cập trang web Fear & Greed Index
+        driver.get("https://www.coinglass.com/vi/pro/i/FearGreedIndex")
+        time.sleep(3)  # Đợi trang web tải xong
 
-    # Chụp ảnh màn hình
-    screenshot_path = "/tmp/fear_greed_screenshot.png"
-    driver.save_screenshot(screenshot_path)
-    driver.quit()
+        # Lưu ảnh chụp màn hình
+        screenshot_path = "/tmp/fear_greed_screenshot.png"
+        driver.save_screenshot(screenshot_path)
+        driver.quit()
 
-    # Mở ảnh đã chụp để xử lý thêm nếu cần (ví dụ: cắt ảnh, thêm thông tin)
-    img = Image.open(screenshot_path)
-    img_byte_arr = BytesIO()
-    img.save(img_byte_arr, format='PNG')
-    img_byte_arr.seek(0)
+        # Kiểm tra nếu ảnh đã được lưu
+        if not os.path.exists(screenshot_path):
+            raise Exception("Không thể lưu ảnh chụp màn hình.")
 
-    return img_byte_arr
+        # Mở ảnh đã chụp để xử lý
+        img = Image.open(screenshot_path)
+        img_byte_arr = BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_byte_arr.seek(0)
+
+        return img_byte_arr
+    except Exception as e:
+        print(f"Error in screenshot_feargreed: {e}")
+        raise e
 
 # Hàm xử lý lệnh /start và nút chọn chức năng
 async def start(update: Update, context: CallbackContext) -> None:
@@ -47,11 +56,13 @@ async def button(update: Update, context: CallbackContext) -> None:
 
     if query.data == 'feargreed':
         # Chụp ảnh màn hình trang web
-        img_byte_arr = screenshot_feargreed()
-
-        # Gửi ảnh cho người dùng
-        await query.message.reply_text("Đây là Chỉ số Sợ hãi và Tham lam hiện tại:")
-        await query.message.reply_photo(photo=img_byte_arr)
+        try:
+            img_byte_arr = screenshot_feargreed()
+            await query.message.reply_text("Đây là Chỉ số Sợ hãi và Tham lam hiện tại:")
+            await query.message.reply_photo(photo=img_byte_arr)
+        except Exception as e:
+            print(f"Error: {e}")
+            await query.message.reply_text("Có lỗi xảy ra khi chụp ảnh màn hình.")
 
 # Hàm main để khởi chạy bot
 def main() -> None:
