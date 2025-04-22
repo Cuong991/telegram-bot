@@ -1,8 +1,7 @@
 import time
 from selenium import webdriver
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
-from telegram.ext import CallbackContext, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 from PIL import Image
 from io import BytesIO
 
