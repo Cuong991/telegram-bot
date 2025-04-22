@@ -8,7 +8,8 @@ import datetime
 import pytz
 
 # Token của bạn
-TOKEN = "7804124843:AAGIrk - Token của bạn
+TOKEN = "7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk"
+
 # Danh sách lưu chat_id
 chat_ids = set()
 
