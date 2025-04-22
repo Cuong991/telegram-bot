@@ -7,7 +7,7 @@ import nest_asyncio
 import asyncio
 
 # Token của bạn
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = "7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk"
 
 # Hàm xử lý khi bấm nút
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
