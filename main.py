@@ -1,7 +1,7 @@
 import time
 from selenium import webdriver
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, CallbackContext
 from PIL import Image
 from io import BytesIO
 
@@ -33,44 +33,39 @@ def screenshot_feargreed():
     return img_byte_arr
 
 # Hàm xử lý lệnh /start và nút chọn chức năng
-def start(update: Update, context: CallbackContext) -> None:
+async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
         [InlineKeyboardButton("Xem Chỉ số Sợ hãi và Tham lam", callback_data='feargreed')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Chọn một chức năng:', reply_markup=reply_markup)
+    await update.message.reply_text('Chọn một chức năng:', reply_markup=reply_markup)
 
 # Hàm xử lý nút "Xem Chỉ số Sợ hãi và Tham lam"
-def button(update: Update, context: CallbackContext) -> None:
+async def button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    query.answer()
+    await query.answer()
 
     if query.data == 'feargreed':
         # Chụp ảnh màn hình trang web
         img_byte_arr = screenshot_feargreed()
 
         # Gửi ảnh cho người dùng
-        query.message.reply_text("Đây là Chỉ số Sợ hãi và Tham lam hiện tại:")
-        query.message.reply_photo(photo=img_byte_arr)
+        await query.message.reply_text("Đây là Chỉ số Sợ hãi và Tham lam hiện tại:")
+        await query.message.reply_photo(photo=img_byte_arr)
 
 # Hàm main để khởi chạy bot
 def main() -> None:
-    updater = Updater(TOKEN)
-
-    # Lấy dispatcher để thêm handler
-    dispatcher = updater.dispatcher
+    # Khởi tạo ứng dụng và thêm handler
+    application = Application.builder().token(TOKEN).build()
 
     # Thêm handler cho lệnh /start
-    dispatcher.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("start", start))
 
     # Thêm handler cho các nút bấm
-    dispatcher.add_handler(CallbackQueryHandler(button))
+    application.add_handler(CallbackQueryHandler(button))
 
     # Bắt đầu bot
-    updater.start_polling()
-
-    # Chạy bot cho đến khi bị dừng
-    updater.idle()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
