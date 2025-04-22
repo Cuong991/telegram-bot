@@ -13,30 +13,40 @@ def capture_fear_greed_index():
     chrome_options.add_argument("--headless=new")  # Headless mới
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--window-size=1920,1080")
     driver = webdriver.Chrome(options=chrome_options)
 
-    url = "https://coinmarketcap.com/vi/charts/fear-and-greed-index/"
-    driver.get(url)
-    time.sleep(5)
+    try:
+        driver.get("https://coinmarketcap.com/vi/charts/fear-and-greed-index/")
+        time.sleep(5)  # Chờ trang load hoàn toàn
 
-    # Full screenshot
-    driver.save_screenshot('full_screenshot.png')
+        # Full screenshot
+        driver.save_screenshot('full_screenshot.png')
 
-    # Tìm đúng phần tử cần crop
-    element = driver.find_element("xpath", '//div[contains(@class, "iULUNk")]')  # Update xpath nếu cần
+        # Tìm đúng phần tử cần crop
+        element = driver.find_element("xpath", '//div[contains(@class, "iULUNk")]')  # Update xpath nếu cần
+        location = element.location
+        size = element.size
 
-    location = element.location
-    size = element.size
-    driver.quit()
+        print(f"Location: {location}, Size: {size}")
 
-    x = int(location['x'])
-    y = int(location['y'])
-    width = int(size['width'])
-    height = int(size['height'])
+        # Chuyển tọa độ và kích thước ra hình ảnh
+        x = int(location['x'])
+        y = int(location['y'])
+        width = int(size['width'])
+        height = int(size['height'])
 
-    im = Image.open('full_screenshot.png')
-    im_cropped = im.crop((x, y, x + width, y + height))
-    im_cropped.save('fear_greed_index.png')
+        # Crop ảnh
+        im = Image.open('full_screenshot.png')
+        im_cropped = im.crop((x, y, x + width, y + height))
+        im_cropped.save('fear_greed_index.png')
+        
+        print("Cropped image saved as 'fear_greed_index.png'")
+        
+        return 'fear_greed_index.png'
+
+    finally:
+        driver.quit()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -50,13 +60,21 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.edit_message_text(text="Đang lấy chỉ số, vui lòng chờ...")
 
-    capture_fear_greed_index()
+    # Gọi hàm chụp ảnh
+    img_path = capture_fear_greed_index()
 
-    with open('fear_greed_index.png', 'rb') as photo:
-        await query.message.reply_photo(photo, caption="Chỉ số Sợ hãi & Tham lam hiện tại:")
+    # Debug: Kiểm tra xem ảnh có thực sự có tại img_path không
+    if os.path.exists(img_path):
+        print(f"File {img_path} exists, sending photo.")
+        with open(img_path, 'rb') as photo:
+            await query.message.reply_photo(photo, caption="Chỉ số Sợ hãi & Tham lam hiện tại:")
 
-    os.remove('full_screenshot.png')
-    os.remove('fear_greed_index.png')
+        # Xóa file sau khi gửi
+        os.remove(img_path)
+        os.remove('full_screenshot.png')
+    else:
+        print("File not found! Error in capturing image.")
+        await query.message.reply_text('Có lỗi khi lấy ảnh. Vui lòng thử lại sau!')
 
 def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
