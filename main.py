@@ -7,6 +7,7 @@ import nest_asyncio
 import asyncio
 import datetime
 import pytz
+from telegram.error import TelegramError
 
 # Thiết lập logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -22,8 +23,8 @@ chat_ids = set()
 def get_fear_and_greed():
     try:
         url = "https://api.alternative.me/fng/"
-        response = requests.get(url)
-        response.raise_for_status()  # Kiểm tra lỗi HTTP
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
         data = response.json()
         value = int(data['data'][0]['value'])
         logger.info(f"Fear & Greed Index: {value}")
@@ -75,7 +76,7 @@ def get_status_text(value):
 def get_dominance_data():
     try:
         url = "https://api.coingecko.com/api/v3/global"
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
 
@@ -86,6 +87,23 @@ def get_dominance_data():
     except Exception as e:
         logger.error(f"Lỗi khi lấy dữ liệu Dominance: {e}")
         return None, None
+
+# Hàm kiểm tra trạng thái bot
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        vietnam_time = get_vietnam_time()
+        message = (
+            f"🟢 Bot đang hoạt động!\n\n"
+            f"Thời gian: {vietnam_time}\n"
+            f"Chat ID: {update.message.chat_id}\n"
+            f"Số lượng chat đăng ký: {len(chat_ids)}\n\n"
+            f"<b>Admin</b>: @cuong49"
+        )
+        await update.message.reply_text(message, parse_mode="HTML")
+        logger.info(f"Trạng thái bot được kiểm tra bởi chat_id {update.message.chat_id}")
+    except Exception as e:
+        logger.error(f"Lỗi trong status: {e}")
+        await update.message.reply_text("Đã xảy ra lỗi. Vui lòng thử lại sau.", parse_mode="HTML")
 
 # Hàm gửi cảnh báo định kỳ
 async def send_fear_greed_alert(context: ContextTypes.DEFAULT_TYPE):
@@ -104,7 +122,7 @@ async def send_fear_greed_alert(context: ContextTypes.DEFAULT_TYPE):
                 try:
                     await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
                     logger.info(f"Gửi cảnh báo đến chat_id {chat_id}")
-                except Exception as e:
+                except TelegramError as e:
                     logger.error(f"Lỗi khi gửi tin nhắn đến chat_id {chat_id}: {e}")
         else:
             message = "Không thể lấy dữ liệu Fear & Greed. Vui lòng thử lại sau."
@@ -112,7 +130,7 @@ async def send_fear_greed_alert(context: ContextTypes.DEFAULT_TYPE):
                 try:
                     await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
                     logger.info(f"Gửi thông báo lỗi đến chat_id {chat_id}")
-                except Exception as e:
+                except TelegramError as e:
                     logger.error(f"Lỗi khi gửi tin nhắn đến chat_id {chat_id}: {e}")
     except Exception as e:
         logger.error(f"Lỗi trong send_fear_greed_alert: {e}")
@@ -130,9 +148,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("⭐Chọn chức năng thực hiện⭐: More to come soon!", reply_markup=reply_markup)
-    except Exception as e:
+    except TelegramError as e:
         logger.error(f"Lỗi trong start: {e}")
-        await update.message.reply_text("Đã xảy ra lỗi. Vui lòng thử lại sau.")
+        await update.message.reply_text("Đã xảy ra lỗi. Vui lòng thử lại sau.", parse_mode="HTML")
 
 # Khi gõ /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -140,13 +158,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         help_text = (
             "Các lệnh hỗ trợ:\n\n"
             "/start - Bắt đầu sử dụng bot\n"
-            "/help - Xem hướng dẫn các lệnh\n\n"
+            "/help - Xem hướng dẫn các lệnh\n"
+            "/status - Kiểm tra trạng thái bot\n\n"
             "👉 Admin hỗ trợ: @cuong49"
         )
         await update.message.reply_text(help_text)
-    except Exception as e:
+    except TelegramError as e:
         logger.error(f"Lỗi trong help_command: {e}")
-        await update.message.reply_text("Đã xảy ra lỗi. Vui lòng thử lại sau.")
+        await update.message.reply_text("Đã xảy ra lỗi. Vui lòng thử lại sau.", parse_mode="HTML")
 
 # Khi bấm nút
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -162,82 +181,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 status_text, _ = get_status_text(value)
                 vietnam_time = get_vietnam_time()
                 message = (
-                    f">>Chỉ số Tham lam & sợi hiện tại: 👉 <b>{value}</b>\n\n"
+                    f">>Chỉ số Tham lam & Sợ hãi hiện tại: 👉 <b>{value}</b>\n\n"
                     f"Thời gian: {vietnam_time}\n\n"
                     f"- <b>Trạng thái:</b> {status_text}\n\n"
                     f"🔴 = sợ hãi tột độ\n"
-                    f"🟠 = sợ hãi\n"
-                    f"🔵 = trung lập\n"
-                    f"🟢 = tham lam\n"
-                    f"🟢⚡ = tham lam tột độ\n\n"
-                    f"<b>Admin</b>: @cuong49"
-                )
-            else:
-                message = "Không thể lấy dữ liệu chỉ số. Vui lòng thử lại sau."
-
-            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
-
-        elif query.data == "check_dominance":
-            btc_dominance, altcoin_dominance = get_dominance_data()
-            if btc_dominance is not None:
-                vietnam_time = get_vietnam_time()
-
-                if altcoin_dominance < 45:
-                    season_chance = "Thấp 🔻"
-                elif 45 <= altcoin_dominance < 55:
-                    season_chance = "Trung bình ⚖️"
-                elif 55 <= altcoin_dominance < 65:
-                    season_chance = "Khả năng sắp diễn ra cao 🚀"
-                else:
-                    season_chance = "Altcoin season đang diễn ra 🌟"
-
-                message = (
-                    f">>Chỉ số Bitcoin Dominance hiện tại: 👉 <b>{btc_dominance}%</b>\n\n"
-                    f"Chỉ số Altcoin Dominance hiện tại: 👉 <b>{altcoin_dominance}%</b>\n\n"
-                    f"Thời gian: {vietnam_time}\n\n"
-                    f"Khả năng altcoin season diễn ra: <b>{season_chance}</b>\n\n"
-                    f"- <b>Ghi chú:</b> Chỉ số Altcoin Dominance càng cao thì khả năng Altcoin Season càng mạnh.\n\n"
-                    f"<b>Admin</b>: @cuong49"
-                )
-            else:
-                message = "Không thể lấy dữ liệu Dominance. Vui lòng thử lại sau."
-
-            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
-
-        elif query.data == "test_function":
-            vietnam_time = get_vietnam_time()
-            message = (
-                f">>Chức năng Test đang hoạt động! 🎉\n\n"
-                f"Thời gian: {vietnam_time}\n\n"
-                f"Đây là một chức năng thử nghiệm.\n\n"
-                f"<b>Admin</b>: @cuong49"
-            )
-            await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
-
-    except Exception as e:
-        logger.error(f"Lỗi trong button: {e}")
-        await context.bot.send_message(chat_id=chat_id, text="Đã xảy ra lỗi. Vui lòng thử lại sau.", parse_mode="HTML")
-
-async def main():
-    try:
-        app = ApplicationBuilder().token(TOKEN).build()
-
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("help", help_command))
-        app.add_handler(CallbackQueryHandler(button))
-
-        # Thêm công việc định kỳ: gửi cảnh báo mỗi 24 giờ
-        app.job_queue.run_repeating(send_fear_greed_alert, interval=24*60*60, first=10)  # Chạy sau 10 giây đầu tiên
-
-        logger.info("Bắt đầu chạy bot...")
-        await app.run_polling()
-    except Exception as e:
-        logger.error(f"Lỗi trong main: {e}")
-        raise
-
-if __name__ == "__main__":
-    try:
-        nest_asyncio.apply()
-        asyncio.run(main())
-    except Exception as e:
-        logger.error(f"Lỗi khi khởi động: {e}")
+                    f"🟠
