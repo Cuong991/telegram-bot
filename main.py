@@ -109,7 +109,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🔵 = trung lập\n"
                 f"🟢 = tham lam\n"
                 f"🟢⚡ = tham lam tột độ\n\n"
-                f"<b>Admin</b>: @cuong49"
+                f"<b>Developed by</b>: @cuong49"
             )
         else:
             message = "Không thể lấy dữ liệu chỉ số. Vui lòng thử lại sau."
@@ -135,9 +135,9 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f">>Chỉ số Bitcoin Dominance hiện tại: 👉 <b>{btc_dominance}%</b>\n\n"
                 f"Chỉ số Altcoin Dominance hiện tại: 👉 <b>{altcoin_dominance}%</b>\n\n"
                 f"Thời gian: {vietnam_time}\n\n"
-                f"Khả năng altcoin season diễn ra: <b>{season_chance}</b>\n\n"
+                f"▶️Khả năng altcoin season diễn ra: <b>{season_chance}</b>\n\n"
                 f"- <b>Ghi chú:</b> Chỉ số Altcoin Dominance càng cao thì khả năng Altcoin Season càng mạnh.\n\n"
-                f"<b>Admin</b>: @cuong49"
+                f"<b>Developed by</b>: @cuong49"
             )
         else:
             message = "Không thể lấy dữ liệu Dominance. Vui lòng thử lại sau."
