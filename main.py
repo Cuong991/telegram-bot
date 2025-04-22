@@ -1,66 +1,87 @@
-import logging
-import requests
-from io import BytesIO
+import os
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from PIL import Image
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler
 
-# === Config ===
-TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- thay bằng token bot của bạn
-SCREENSHOT_API = 'https://image.thum.io/get/width/1920/crop/1080/fullpage/https://coinmarketcap.com/vi/charts/fear-and-greed-index/'
-# === Setup logging ===
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+# --- Telegram Bot Token ---
+TELEGRAM_TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
 
-# === Start command ===
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- Khởi tạo trình duyệt Chrome ---
+def capture_fear_greed_index():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--window-size=1920,1080")
+    driver = webdriver.Chrome(options=chrome_options)
+
+    try:
+        driver.get("https://coinmarketcap.com/vi/charts/fear-and-greed-index/")
+        time.sleep(5)  # Chờ trang load hoàn toàn
+
+        # Tìm phần tử chính chứa Chỉ số
+        element = driver.find_element("xpath", '//div[contains(text(),"Chỉ số sợ hãi và tham lam của tiền điện tử CMC")]/ancestor::section')
+
+        # Chụp toàn trang
+        driver.save_screenshot("full_screenshot.png")
+
+        # Lấy tọa độ
+        location = element.location_once_scrolled_into_view
+        size = element.size
+        x = location['x']
+        y = location['y']
+        width = size['width']
+        height = size['height']
+
+        # Crop
+        image = Image.open("full_screenshot.png")
+        cropped_image = image.crop((x, y, x + width, y + height))
+        cropped_image.save("fear_greed_index.png")
+        
+        return "fear_greed_index.png"
+
+    finally:
+        driver.quit()
+
+# --- Handler lệnh /start ---
+def start(update: Update, context: CallbackContext):
     keyboard = [
-        [InlineKeyboardButton("Xem chỉ số tham lam và sợ hãi", callback_data='fear_greed')]
+        [InlineKeyboardButton("Xem chỉ số Sợ hãi & Tham lam", callback_data='fear_greed')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Chào bạn! Chọn chức năng bên dưới:', reply_markup=reply_markup)
+    update.message.reply_text('Chào bạn! Chọn chức năng bên dưới:', reply_markup=reply_markup)
 
-# === Handle button press ===
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- Handler khi bấm nút ---
+def button(update: Update, context: CallbackContext):
     query = update.callback_query
-    await query.answer()
+    query.answer()
 
     if query.data == 'fear_greed':
-        # Tải ảnh full trang
-        response = requests.get(SCREENSHOT_API)
+        query.edit_message_text(text="Đang lấy chỉ số, vui lòng chờ...")
 
-        if response.status_code == 200:
-            img = Image.open(BytesIO(response.content))
+        # Gọi hàm chụp ảnh
+        img_path = capture_fear_greed_index()
 
-            # --- Crop ảnh --- 
-            # Bạn chỉnh các giá trị này nếu cần fine-tune
-            left = 150
-            top = 244
-            right = 0
-            bottom = 700
-            cropped_img = img.crop((left, top, right, bottom))
+        # Gửi ảnh
+        context.bot.send_photo(chat_id=query.message.chat.id, photo=open(img_path, 'rb'))
 
-            # Lưu ảnh vào bộ nhớ để gửi
-            img_byte_arr = BytesIO()
-            cropped_img.save(img_byte_arr, format='PNG')
-            img_byte_arr.seek(0)
+        # Xóa file sau khi gửi
+        os.remove(img_path)
+        os.remove("full_screenshot.png")
 
-            await query.message.reply_photo(
-                photo=img_byte_arr,
-                caption="Chỉ số tham lam và sợ hãi hiện tại!"
-            )
-        else:
-            await query.message.reply_text('Không lấy được ảnh. Thử lại sau!')
-
-# === Main ===
+# --- Main ---
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler('start', start))
-    app.add_handler(CallbackQueryHandler(button))
-    app.run_polling()
+    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+
+    updater.dispatcher.add_handler(CommandHandler('start', start))
+    updater.dispatcher.add_handler(CallbackQueryHandler(button))
+
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
     main()
-            
+        
