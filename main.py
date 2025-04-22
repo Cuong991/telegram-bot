@@ -7,8 +7,12 @@ import asyncio
 import datetime
 import pytz
 
-# Token của bạn
+# Token bot của bạn
 TOKEN = "7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk"
+
+# Chat ID nhận cảnh báo (group hoặc cá nhân)
+# Ví dụ: -100xxxxxxxxxx (nếu là group) hoặc 123456789 (nếu là cá nhân)
+YOUR_CHAT_ID = YOUR_CHAT_ID_HERE  # <<<--- Điền Chat ID đúng vào đây
 
 # Hàm lấy dữ liệu Fear & Greed Index
 def get_fear_and_greed():
@@ -69,7 +73,7 @@ def get_dominance_data():
         print(f"Lỗi khi lấy dữ liệu Dominance: {e}")
         return None, None
 
-# Khi gõ /start
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Chỉ số Tham lam & Sợ hãi Crypto", callback_data="check_fear_greed")],
@@ -78,7 +82,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("⭐Chọn chức năng thực hiện⭐: More to come soon!", reply_markup=reply_markup)
 
-# Khi gõ /help
+# /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "Các lệnh hỗ trợ:\n\n"
@@ -121,7 +125,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if btc_dominance is not None:
             vietnam_time = get_vietnam_time()
 
-            # Dự đoán khả năng Altcoin Season với emoji
             if altcoin_dominance < 45:
                 season_chance = "Thấp 🔻"
             elif 45 <= altcoin_dominance < 55:
@@ -144,6 +147,38 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
+# Tự động kiểm tra và gửi cảnh báo
+async def send_warning_alert(app):
+    while True:
+        try:
+            value = get_fear_and_greed()
+            if value is not None:
+                if value >= 75:
+                    warning_message = (
+                        f"⚡⚡⚡ CẢNH BÁO: Chỉ số Tham lam cực đại!\n\n"
+                        f"Chỉ số hiện tại: {value}\n"
+                        f"Tham lam cực mạnh, hãy cẩn trọng!\n"
+                        f"<b>Admin</b>: @cuong49"
+                    )
+                elif value <= 20:
+                    warning_message = (
+                        f"⚠️⚠️⚠️ CẢNH BÁO: Chỉ số Sợ hãi tột độ!\n\n"
+                        f"Chỉ số hiện tại: {value}\n"
+                        f"Thị trường đang rất hoảng loạn!\n"
+                        f"<b>Admin</b>: @cuong49"
+                    )
+                else:
+                    warning_message = None
+
+                if warning_message:
+                    await app.bot.send_message(chat_id=YOUR_CHAT_ID, text=warning_message, parse_mode="HTML")
+
+        except Exception as e:
+            print(f"Lỗi khi gửi cảnh báo: {e}")
+
+        await asyncio.sleep(3600)  # Kiểm tra mỗi 1 giờ
+
+# Main
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -151,9 +186,11 @@ async def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button))
 
+    asyncio.create_task(send_warning_alert(app))
+
     await app.run_polling()
 
 if __name__ == "__main__":
     nest_asyncio.apply()
     asyncio.run(main())
-    
+        
