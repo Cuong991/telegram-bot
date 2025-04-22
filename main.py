@@ -1,5 +1,7 @@
 import logging
 import requests
+from io import BytesIO
+from PIL import Image
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -27,14 +29,29 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'fear_greed':
-        # Tải ảnh chụp web
-        image_url = SCREENSHOT_API
-        response = requests.get(image_url)
+        # Tải ảnh full trang
+        response = requests.get(SCREENSHOT_API)
 
         if response.status_code == 200:
+            img = Image.open(BytesIO(response.content))
+
+            # --- Crop ảnh --- 
+            # Bạn chỉnh các giá trị này nếu cần fine-tune
+            left = 60
+            top = 200
+            right = 1050
+            bottom = 800
+
+            cropped_img = img.crop((left, top, right, bottom))
+
+            # Lưu ảnh vào bộ nhớ để gửi
+            img_byte_arr = BytesIO()
+            cropped_img.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+
             await query.message.reply_photo(
-                photo=response.content,
-                caption="Chỉ số tham lam và sợ hãi hiện tại, xem chi tiết trong ảnh nhé!"
+                photo=img_byte_arr,
+                caption="Chỉ số tham lam và sợ hãi hiện tại!"
             )
         else:
             await query.message.reply_text('Không lấy được ảnh. Thử lại sau!')
@@ -48,4 +65,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
+            
