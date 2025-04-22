@@ -9,7 +9,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 
 # === Config ===
 TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- thay bằng token bot của bạn
-SCREENSHOT_API = 'https://www.coinglass.com/vi/pro/i/FearGreedIndex'
+SCREENSHOT_API = 'https://image.thum.io/get/fullpage/https://www.coinglass.com/vi/pro/i/FearGreedIndex'
 
 # === Setup logging ===
 logging.basicConfig(
