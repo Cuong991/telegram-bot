@@ -8,7 +8,9 @@ import datetime
 import pytz
 
 # Token của bạn
-TOKEN = "7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk"
+TOKEN = "7804124843:AAGIrk - Token của bạn
+# Danh sách lưu chat_id
+chat_ids = set()
 
 # Hàm lấy dữ liệu Fear & Greed Index
 def get_fear_and_greed():
@@ -41,18 +43,18 @@ def get_vietnam_time():
     formatted_time = now.strftime(f"%H:%M - %d/%m/%Y ({quarter})")
     return formatted_time
 
-# Hàm chuyển chỉ số thành tiếng Việt
+# Hàm chuyển chỉ số thành tiếng Việt và mức cảnh báo
 def get_status_text(value):
     if value <= 24:
-        return "Sợ hãi tột độ🔴"
+        return "Sợ hãi tột độ🔴", "⚡⚡⚡ CẢNH BÁO: Chỉ số Sợ hãi tột độ! Hãy cẩn trọng!"
     elif 25 <= value <= 49:
-        return "Sợ hãi🟠"
+        return "Sợ hãi🟠", "⚡ CẢNH BÁO: Thị trường đang sợ hãi!"
     elif 50 <= value <= 54:
-        return "Trung lập🔵"
+        return "Trung lập🔵", "🔔 THÔNG BÁO: Thị trường ở trạng thái trung lập."
     elif 55 <= value <= 74:
-        return "Tham lam🟢"
+        return "Tham lam🟢", "⚡ CẢNH BÁO: Thị trường đang tham lam!"
     else:
-        return "Tham lam tột độ🟢⚡"
+        return "Tham lam tột độ🟢⚡", "⚡⚡⚡ CẢNH BÁO: Chỉ số Tham lam đạt cực đại! Hãy cẩn trọng!"
 
 # Hàm lấy Bitcoin và Altcoin Dominance từ CoinGecko API
 def get_dominance_data():
@@ -69,12 +71,39 @@ def get_dominance_data():
         print(f"Lỗi khi lấy dữ liệu Dominance: {e}")
         return None, None
 
+# Hàm gửi cảnh báo định kỳ
+async def send_fear_greed_alert(context: ContextTypes.DEFAULT_TYPE):
+    value = get_fear_and_greed()
+    if value is not None:
+        status_text, alert_message = get_status_text(value)
+        vietnam_time = get_vietnam_time()
+        message = (
+            f"{alert_message}\n\n"
+            f"Chỉ số hiện tại: <b>{value}</b>\n"
+            f"Thời gian: {vietnam_time}\n\n"
+            f"<b>Admin</b>: @cuong49"
+        )
+        for chat_id in chat_ids:
+            try:
+                await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
+            except Exception as e:
+                print(f"Lỗi khi gửi tin nhắn đến chat_id {chat_id}: {e}")
+    else:
+        message = "Không thể lấy dữ liệu Fear & Greed. Vui lòng thử lại sau."
+        for chat_id in chat_ids:
+            try:
+                await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
+            except Exception as e:
+                print(f"Lỗi khi gửi tin nhắn đến chat_id {chat_id}: {e}")
+
 # Khi gõ /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat_id
+    chat_ids.add(chat_id)  # Lưu chat_id
     keyboard = [
         [InlineKeyboardButton("Chỉ số Tham lam & Sợ hãi Crypto", callback_data="check_fear_greed")],
         [InlineKeyboardButton("Chỉ số Bitcoin Dominance & Altcoin", callback_data="check_dominance")],
-        [InlineKeyboardButton("Chức năng Test", callback_data="test_function")],  # Nút mới
+        [InlineKeyboardButton("Chức năng Test", callback_data="test_function")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("⭐Chọn chức năng thực hiện⭐: More to come soon!", reply_markup=reply_markup)
@@ -99,7 +128,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "check_fear_greed":
         value = get_fear_and_greed()
         if value is not None:
-            status_text = get_status_text(value)
+            status_text, _ = get_status_text(value)
             vietnam_time = get_vietnam_time()
             message = (
                 f">>Chỉ số Tham lam & Sợ hãi hiện tại: 👉 <b>{value}</b>\n\n"
@@ -144,7 +173,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
-    elif query.data == "test_function":  # Xử lý nút mới
+    elif query.data == "test_function":
         vietnam_time = get_vietnam_time()
         message = (
             f">>Chức năng Test đang hoạt động! 🎉\n\n"
@@ -160,6 +189,9 @@ async def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button))
+
+    # Thêm công việc định kỳ: gửi cảnh báo mỗi 24 giờ
+    app.job_queue.run_repeating(send_fear_greed_alert, interval=24*60*60, first=10)  # Chạy sau 10 giây đầu tiên
 
     await app.run_polling()
 
