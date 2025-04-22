@@ -74,6 +74,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Chỉ số Tham lam & Sợ hãi Crypto", callback_data="check_fear_greed")],
         [InlineKeyboardButton("Chỉ số Bitcoin Dominance & Altcoin", callback_data="check_dominance")],
+        [InlineKeyboardButton("Chức năng Test", callback_data="test_function")],  # Nút mới
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("⭐Chọn chức năng thực hiện⭐: More to come soon!", reply_markup=reply_markup)
@@ -121,7 +122,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if btc_dominance is not None:
             vietnam_time = get_vietnam_time()
 
-            # Dự đoán khả năng Altcoin Season với emoji
             if altcoin_dominance < 45:
                 season_chance = "Thấp 🔻"
             elif 45 <= altcoin_dominance < 55:
@@ -144,6 +144,16 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
+    elif query.data == "test_function":  # Xử lý nút mới
+        vietnam_time = get_vietnam_time()
+        message = (
+            f">>Chức năng Test đang hoạt động! 🎉\n\n"
+            f"Thời gian: {vietnam_time}\n\n"
+            f"Đây là một chức năng thử nghiệm.\n\n"
+            f"<b>Admin</b>: @cuong49"
+        )
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
+
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -156,4 +166,3 @@ async def main():
 if __name__ == "__main__":
     nest_asyncio.apply()
     asyncio.run(main())
-    
