@@ -73,7 +73,7 @@ def get_dominance_data():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Chỉ số Tham lam & Sợ hãi Crypto", callback_data="check_fear_greed")],
-        [InlineKeyboardButton("Chỉ số Bitcoin Dominance & Altcoin", callback_data="check_dominance"),
+        [InlineKeyboardButton("Chỉ số Bitcoin Dominance & Altcoin", callback_data="check_dominance")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("⭐Chọn chức năng thực hiện⭐: More to come soon!", reply_markup=reply_markup)
@@ -109,7 +109,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🔵 = trung lập\n"
                 f"🟢 = tham lam\n"
                 f"🟢⚡ = tham lam tột độ\n\n"
-                f"<b>Developed by</b>: @cuong49"
+                f"<b>Admin</b>: @cuong49"
             )
         else:
             message = "Không thể lấy dữ liệu chỉ số. Vui lòng thử lại sau."
@@ -135,15 +135,15 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f">>Chỉ số Bitcoin Dominance hiện tại: 👉 <b>{btc_dominance}%</b>\n\n"
                 f"Chỉ số Altcoin Dominance hiện tại: 👉 <b>{altcoin_dominance}%</b>\n\n"
                 f"Thời gian: {vietnam_time}\n\n"
-                f"▶️Khả năng altcoin season diễn ra: <b>{season_chance}</b>\n\n"
+                f"Khả năng altcoin season diễn ra: <b>{season_chance}</b>\n\n"
                 f"- <b>Ghi chú:</b> Chỉ số Altcoin Dominance càng cao thì khả năng Altcoin Season càng mạnh.\n\n"
-                f"<b>Developed by</b>: @cuong49"
+                f"<b>Admin</b>: @cuong49"
             )
         else:
             message = "Không thể lấy dữ liệu Dominance. Vui lòng thử lại sau."
 
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
-        
+
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
