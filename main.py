@@ -6,8 +6,6 @@ import nest_asyncio
 import asyncio
 import datetime
 import pytz
-from functions.nutbam3 import handle_Nut_bam_3 #Nút bấm 3
-
 
 # Token của bạn
 TOKEN = "7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk"
@@ -75,8 +73,7 @@ def get_dominance_data():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Chỉ số Tham lam & Sợ hãi Crypto", callback_data="check_fear_greed")],
-        [InlineKeyboardButton("Chỉ số Bitcoin Dominance & Altcoin", callback_data="check_dominance")]
-        [InlineKeyboardButton("Nút Bấm 3", callback_data="Nut_bam_3")]   # << Thêm nút này
+        [InlineKeyboardButton("Chỉ số Bitcoin Dominance & Altcoin", callback_data="check_dominance"),
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("⭐Chọn chức năng thực hiện⭐: More to come soon!", reply_markup=reply_markup)
@@ -147,9 +144,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
         
-        elif query.data == "nut_bam_3":
-    await handle_nut_bam_3(update, context)#
-
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
