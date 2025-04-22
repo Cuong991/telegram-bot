@@ -1,7 +1,7 @@
 import os
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue
 import nest_asyncio
 import asyncio
 import datetime
@@ -11,8 +11,7 @@ import pytz
 TOKEN = "7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk"
 
 # Chat ID nhận cảnh báo (group hoặc cá nhân)
-# Ví dụ: -100xxxxxxxxxx (nếu là group) hoặc 123456789 (nếu là cá nhân)
-YOUR_CHAT_ID = YOUR_CHAT_ID_HERE  # <<<--- Điền Chat ID đúng vào đây
+YOUR_CHAT_ID = YOUR_CHAT_ID_HERE  # <<<--- Điền Chat ID ở đây
 
 # Hàm lấy dữ liệu Fear & Greed Index
 def get_fear_and_greed():
@@ -147,36 +146,29 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
-# Tự động kiểm tra và gửi cảnh báo
-async def send_warning_alert(app):
-    while True:
-        try:
-            value = get_fear_and_greed()
-            if value is not None:
-                if value >= 75:
-                    warning_message = (
-                        f"⚡⚡⚡ CẢNH BÁO: Chỉ số Tham lam cực đại!\n\n"
-                        f"Chỉ số hiện tại: {value}\n"
-                        f"Tham lam cực mạnh, hãy cẩn trọng!\n"
-                        f"<b>Admin</b>: @cuong49"
-                    )
-                elif value <= 20:
-                    warning_message = (
-                        f"⚠️⚠️⚠️ CẢNH BÁO: Chỉ số Sợ hãi tột độ!\n\n"
-                        f"Chỉ số hiện tại: {value}\n"
-                        f"Thị trường đang rất hoảng loạn!\n"
-                        f"<b>Admin</b>: @cuong49"
-                    )
-                else:
-                    warning_message = None
+# Hàm gửi cảnh báo theo job
+async def send_warning_alert(context: ContextTypes.DEFAULT_TYPE):
+    value = get_fear_and_greed()
+    if value is not None:
+        if value >= 75:
+            warning_message = (
+                f"⚡⚡⚡ CẢNH BÁO: Chỉ số Tham lam cực đại!\n\n"
+                f"Chỉ số hiện tại: {value}\n"
+                f"Tham lam cực mạnh, hãy cẩn trọng!\n"
+                f"<b>Admin</b>: @cuong49"
+            )
+        elif value <= 20:
+            warning_message = (
+                f"⚠️⚠️⚠️ CẢNH BÁO: Chỉ số Sợ hãi tột độ!\n\n"
+                f"Chỉ số hiện tại: {value}\n"
+                f"Thị trường đang rất hoảng loạn!\n"
+                f"<b>Admin</b>: @cuong49"
+            )
+        else:
+            warning_message = None
 
-                if warning_message:
-                    await app.bot.send_message(chat_id=YOUR_CHAT_ID, text=warning_message, parse_mode="HTML")
-
-        except Exception as e:
-            print(f"Lỗi khi gửi cảnh báo: {e}")
-
-        await asyncio.sleep(3600)  # Kiểm tra mỗi 1 giờ
+        if warning_message:
+            await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=warning_message, parse_mode="HTML")
 
 # Main
 async def main():
@@ -186,11 +178,13 @@ async def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button))
 
-    asyncio.create_task(send_warning_alert(app))
+    # Thêm job định kỳ kiểm tra cảnh báo mỗi 1 giờ
+    job_queue = app.job_queue
+    job_queue.run_repeating(send_warning_alert, interval=3600, first=10)  # lần đầu sau 10s, sau đó mỗi 1h
 
     await app.run_polling()
 
 if __name__ == "__main__":
     nest_asyncio.apply()
     asyncio.run(main())
-        
+    
