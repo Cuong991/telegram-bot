@@ -1,54 +1,47 @@
 import os
 import requests
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+import nest_asyncio
+import asyncio
 import datetime
 import pytz
-import asyncio
-import nest_asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
-    ContextTypes, JobQueue
-)
 
-# Token
+# Token của bạn
 TOKEN = "7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk"
-# Chat ID nhận cảnh báo
-YOUR_CHAT_ID = YOUR_CHAT_ID_HERE  # Điền vào đây
 
-# API Fear & Greed
+# Hàm lấy dữ liệu Fear & Greed Index
 def get_fear_and_greed():
     try:
         url = "https://api.alternative.me/fng/"
         response = requests.get(url)
         data = response.json()
+
         value = int(data['data'][0]['value'])
         return value
     except Exception as e:
-        print(f"Lỗi lấy Fear & Greed Index: {e}")
+        print(f"Lỗi khi lấy Fear & Greed Index: {e}")
         return None
 
-# API Dominance
-def get_dominance_data():
-    try:
-        url = "https://api.coingecko.com/api/v3/global"
-        response = requests.get(url)
-        data = response.json()
-        btc_dominance = data['data']['market_cap_percentage']['btc']
-        altcoin_dominance = 100 - btc_dominance
-        return round(btc_dominance, 2), round(altcoin_dominance, 2)
-    except Exception as e:
-        print(f"Lỗi lấy Dominance: {e}")
-        return None, None
-
-# Lấy giờ VN
+# Hàm lấy thời gian hiện tại ở Việt Nam + xác định quý
 def get_vietnam_time():
     vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
     now = datetime.datetime.now(vn_tz)
     month = now.month
-    quarter = f"Quý {((month-1)//3)+1}"
-    return now.strftime(f"%H:%M - %d/%m/%Y ({quarter})")
 
-# Text trạng thái Fear Greed
+    if 1 <= month <= 3:
+        quarter = "Quý 1"
+    elif 4 <= month <= 6:
+        quarter = "Quý 2"
+    elif 7 <= month <= 9:
+        quarter = "Quý 3"
+    else:
+        quarter = "Quý 4"
+
+    formatted_time = now.strftime(f"%H:%M - %d/%m/%Y ({quarter})")
+    return formatted_time
+
+# Hàm chuyển chỉ số thành tiếng Việt
 def get_status_text(value):
     if value <= 24:
         return "Sợ hãi tột độ🔴"
@@ -61,7 +54,22 @@ def get_status_text(value):
     else:
         return "Tham lam tột độ🟢⚡"
 
-# /start
+# Hàm lấy Bitcoin và Altcoin Dominance từ CoinGecko API
+def get_dominance_data():
+    try:
+        url = "https://api.coingecko.com/api/v3/global"
+        response = requests.get(url)
+        data = response.json()
+
+        btc_dominance = data['data']['market_cap_percentage']['btc']
+        altcoin_dominance = 100 - btc_dominance
+
+        return round(btc_dominance, 2), round(altcoin_dominance, 2)
+    except Exception as e:
+        print(f"Lỗi khi lấy dữ liệu Dominance: {e}")
+        return None, None
+
+# Khi gõ /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("Chỉ số Tham lam & Sợ hãi Crypto", callback_data="check_fear_greed")],
@@ -70,7 +78,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("⭐Chọn chức năng thực hiện⭐: More to come soon!", reply_markup=reply_markup)
 
-# /help
+# Khi gõ /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = (
         "Các lệnh hỗ trợ:\n\n"
@@ -80,10 +88,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(help_text)
 
-# Xử lý bấm nút
+# Khi bấm nút
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
     chat_id = query.message.chat_id
 
     if query.data == "check_fear_greed":
@@ -104,12 +113,15 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             message = "Không thể lấy dữ liệu chỉ số. Vui lòng thử lại sau."
+
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
     elif query.data == "check_dominance":
         btc_dominance, altcoin_dominance = get_dominance_data()
         if btc_dominance is not None:
             vietnam_time = get_vietnam_time()
+
+            # Dự đoán khả năng Altcoin Season với emoji
             if altcoin_dominance < 45:
                 season_chance = "Thấp 🔻"
             elif 45 <= altcoin_dominance < 55:
@@ -129,26 +141,9 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             message = "Không thể lấy dữ liệu Dominance. Vui lòng thử lại sau."
+
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
 
-# Cảnh báo tự động
-async def send_warning_alert(context: ContextTypes.DEFAULT_TYPE):
-    value = get_fear_and_greed()
-    if value is not None:
-        message = None
-        if value >= 75:
-            message = (
-                f"⚡⚡⚡ CẢNH BÁO: Tham lam cực đại!\nChỉ số: {value}\n<b>Admin</b>: @cuong49"
-            )
-        elif value <= 20:
-            message = (
-                f"⚠️⚠️⚠️ CẢNH BÁO: Sợ hãi tột độ!\nChỉ số: {value}\n<b>Admin</b>: @cuong49"
-            )
-
-        if message:
-            await context.bot.send_message(chat_id=YOUR_CHAT_ID, text=message, parse_mode="HTML")
-
-# Hàm main
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -156,11 +151,9 @@ async def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button))
 
-    app.job_queue.run_repeating(send_warning_alert, interval=3600, first=10)
-
     await app.run_polling()
 
 if __name__ == "__main__":
     nest_asyncio.apply()
     asyncio.run(main())
-            
+    
