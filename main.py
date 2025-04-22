@@ -36,9 +36,9 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # --- Crop ảnh --- 
             # Bạn chỉnh các giá trị này nếu cần fine-tune
-            left = 100
-            top = 200
-            right = 1820
+            left = 150
+            top = 244
+            right = 0
             bottom = 700
             cropped_img = img.crop((left, top, right, bottom))
 
