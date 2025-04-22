@@ -4,3 +4,4 @@ requests
 pytz
 Pillow
 selenium
+html2image
