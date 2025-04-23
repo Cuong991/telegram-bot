@@ -1,9 +1,11 @@
 import logging
-import httpx
-import asyncio
-from selectolax.parser import HTMLParser
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+import time
 
 # Logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -26,32 +28,36 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.edit_message_text(text=data)
 
-# Đảm bảo website đã load đủ
-async def get_liquidation_data():
+# Dùng Selenium để lấy dữ liệu thanh lý từ trang web
+def get_liquidation_data():
     url = "https://www.coinglass.com/vi/LiquidationData"
 
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept-Language": "vi-VN,vi;q=0.9",
-    }
-
     try:
-        # Dùng httpx để lấy nội dung web
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
-            html = HTMLParser(response.text)
+        # Cấu hình và khởi tạo WebDriver (Chrome)
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')  # Chạy Chrome ở chế độ không hiển thị giao diện (headless)
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
 
-            # Chờ đợi một chút để website load đủ (delay 5s)
-            await asyncio.sleep(5)
+        # Tạo WebDriver
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-            # Tìm đúng phần chứa dữ liệu thanh lý
-            data_section = html.css_first('div.index_title__x6mnK')  # Chúng ta phải tìm đúng div chứa thông tin
+        # Mở trang web
+        driver.get(url)
 
-            if data_section:
-                # Trả về chỉ phần có nội dung thanh lý
-                return data_section.text(strip=True)
-            else:
-                return "Không tìm thấy dữ liệu thanh lý."
+        # Chờ trang web tải xong
+        time.sleep(5)  # Chờ 5 giây để dữ liệu tải đầy đủ
+
+        # Tìm và lấy nội dung thanh lý
+        try:
+            # Lấy phần chứa thông tin thanh lý
+            liquidation_section = driver.find_element(By.CSS_SELECTOR, 'div.index_title__x6mnK')
+            liquidation_text = liquidation_section.text
+        except Exception as e:
+            liquidation_text = f"Không thể lấy dữ liệu thanh lý: {e}"
+
+        driver.quit()
+        return liquidation_text
 
     except Exception as e:
         return f"Đã xảy ra lỗi: {e}"
@@ -63,4 +69,4 @@ if __name__ == '__main__':
     app.add_handler(CallbackQueryHandler(button))
 
     app.run_polling()
-            
+        
