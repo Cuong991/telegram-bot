@@ -1,76 +1,52 @@
-import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+import openai
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from telegram.ext import ContextTypes
 
-# Thay đổi token của bạn tại đây
+# Thay đổi token bot Telegram và OpenAI API key của bạn
 TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
+OPENAI_API_KEY = 'YOUR_OPENAI_API_KEY'
 
-# Hàm lấy dữ liệu Crypto Cap của TOTAL2 từ TradingView
-def get_crypto_cap():
-    # Cấu hình Selenium để chạy trình duyệt không giao diện
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Không mở cửa sổ trình duyệt
-    chrome_driver_path = "/path/to/chromedriver"  # Đảm bảo đường dẫn đúng đến chromedriver
+# Cấu hình OpenAI API
+openai.api_key = OPENAI_API_KEY
 
-    driver = webdriver.Chrome(executable_path=chrome_driver_path, options=chrome_options)
-    driver.get("https://vn.tradingview.com/chart/?symbol=CRYPTOCAP%3ATOTAL2")
-
-    # Đợi trang web tải xong
-    time.sleep(10)
-
-    try:
-        # Tìm chỉ số Crypto Cap của TOTAL2
-        price_element = driver.find_element(By.XPATH, '//*[@id="tv-widget-market-summary"]/div[1]/div[1]/span[1]')
-        price = price_element.text
-
-        # Đóng trình duyệt sau khi lấy dữ liệu
-        driver.quit()
-
-        return price
-    except Exception as e:
-        driver.quit()
-        return f"Đã xảy ra lỗi khi lấy dữ liệu: {e}"
-
-# Hàm xử lý lệnh /start và tạo nút
+# Hàm xử lý lệnh /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # Gửi nút chức năng cho người dùng
-    keyboard = [
-        [InlineKeyboardButton("Lấy dữ liệu Crypto Cap", callback_data='get_cap')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Chào bạn! Nhấn nút dưới đây để lấy dữ liệu Crypto Cap (TOTAL2) hiện tại:", reply_markup=reply_markup)
+    welcome_message = (
+        "👋 Xin chào, tôi là GPT AI được huấn luyện bởi @cuong49\n\n"
+        "💬 Tôi có thể giúp bạn trả lời các câu hỏi, giải thích, hoặc chỉ đơn giản là trò chuyện với bạn. "
+        "Hãy cứ hỏi bất kỳ điều gì bạn muốn, và tôi sẽ cố gắng giúp đỡ bạn! 😄\n\n"
+        "✨ Hãy thử hỏi tôi một câu hỏi nào đó nhé!"
+    )
+    await update.message.reply_text(welcome_message)
 
-# Hàm xử lý khi người dùng nhấn nút
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
+# Hàm xử lý tin nhắn người dùng, trả lời bằng OpenAI GPT
+async def chat_with_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_message = update.message.text
 
-    if query.data == 'get_cap':
-        # Lấy dữ liệu Crypto Cap
-        price = get_crypto_cap()
-
-        # Gửi kết quả về người dùng với icon và văn bản trang trí
-        if "lỗi" in price:
-            await query.edit_message_text(f"❌ Đã xảy ra lỗi khi lấy dữ liệu: {price}")
-        else:
-            await query.edit_message_text(f"📊 **Dữ liệu Crypto Cap hiện tại:**\n\n💰 **TOTAL2**: {price} USD\n\n🕒 Cập nhật theo thời gian thực.")
+    # Gửi câu hỏi người dùng đến OpenAI GPT-3
+    try:
+        response = openai.Completion.create(
+            engine="text-davinci-003",  # Hoặc chọn model khác của OpenAI
+            prompt=user_message,
+            max_tokens=150,
+            temperature=0.7
+        )
+        # Lấy câu trả lời từ OpenAI và gửi lại cho người dùng
+        ai_response = response.choices[0].text.strip()
+        await update.message.reply_text(ai_response)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Đã xảy ra lỗi khi xử lý câu hỏi: {e}")
 
 # Hàm chính để chạy bot
 def main() -> None:
-    # Khởi tạo Application với token của bạn
     application = Application.builder().token(TOKEN).build()
 
     # Đăng ký các handler
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_callback))
+    application.add_handler(CommandHandler("start", start))  # Lệnh /start
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat_with_ai))  # Trả lời tin nhắn
 
-    # Bắt đầu bot
     application.run_polling()
 
 if __name__ == "__main__":
     main()
-    
