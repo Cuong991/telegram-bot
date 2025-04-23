@@ -1,12 +1,13 @@
 import logging
 import aiohttp
+import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token Telegram bot bạn vào đây
+TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token của bạn vào
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Lấy dữ liệu thanh lý mới nhất", callback_data='get_liquidation')]]
@@ -25,35 +26,52 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text=data)
 
 async def get_liquidation_data():
-    url = "https://fapi.coinglass.com/api/futures/liquidation_chart?timeType=24h"
+    url = "https://fapi.binance.com/fapi/v1/allForceOrders"
+
+    now = datetime.datetime.utcnow()
+    past = now - datetime.timedelta(hours=24)
+
+    params = {
+        "startTime": int(past.timestamp() * 1000),
+        "endTime": int(now.timestamp() * 1000),
+        "limit": 1000  # Binance tối đa 1000 lệnh mỗi lần
+    }
 
     headers = {
-        "origin": "https://www.coinglass.com",
-        "referer": "https://www.coinglass.com/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0"
     }
 
     try:
+        total_traders = 0
+        total_value = 0
+        largest_liquidation = 0
+        largest_symbol = ""
+        
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as response:
-                result = await response.json()
+            async with session.get(url, headers=headers, params=params) as response:
+                data = await response.json()
 
-                if result.get("success"):
-                    total_liquidation = result["data"]["totalVolUsd"]
-                    total_traders = result["data"]["totalLiquidated"]
-                    largest_liq = result["data"]["maxSingleLiquidation"]
-                    largest_exchange = result["data"]["maxSingleLiquidationExchange"]
-                    largest_symbol = result["data"]["maxSingleLiquidationSymbol"]
+                if isinstance(data, list):
+                    for order in data:
+                        total_traders += 1
+                        value = float(order['price']) * float(order['origQty'])
+                        total_value += value
+
+                        if value > largest_liquidation:
+                            largest_liquidation = value
+                            largest_symbol = order['symbol']
+
+                    if total_traders == 0:
+                        return "Không có lệnh thanh lý nào trong 24 giờ qua."
 
                     text = (
-                        f"Trong vòng 24 giờ qua, đã có {total_traders:,} nhà giao dịch bị thanh lý, "
-                        f"tổng giá trị thanh lý là ${total_liquidation/1_000_000:.2f}M.\n"
-                        f"Lệnh thanh lý lớn nhất xảy ra trên {largest_exchange} - {largest_symbol} "
-                        f"giá trị là ${largest_liq/1_000_000:.2f}M."
+                        f"Trong vòng 24 giờ qua, đã có {total_traders:,} lệnh thanh lý, "
+                        f"tổng giá trị thanh lý là ${total_value/1_000_000:.2f}M.\n"
+                        f"Lệnh thanh lý lớn nhất: {largest_symbol} trị giá ${largest_liquidation/1_000_000:.2f}M."
                     )
                     return text
                 else:
-                    return "Không thể lấy dữ liệu từ Coinglass. Có thể API thay đổi?"
+                    return "Không thể lấy dữ liệu từ Binance."
     except Exception as e:
         return f"Đã xảy ra lỗi: {e}"
 
