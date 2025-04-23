@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 
 # Thay đổi token bot Telegram và OpenAI API key của bạn
 TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
-OPENAI_API_KEY = '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'
+OPENAI_API_KEY = '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'
 
 # Cấu hình OpenAI API
 openai.api_key = OPENAI_API_KEY
