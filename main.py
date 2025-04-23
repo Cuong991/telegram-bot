@@ -1,56 +1,64 @@
 import requests
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import Updater, CommandHandler
 import time
 
 TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
 
-# Hàm lấy dữ liệu thanh lý từ Binance
-def get_binance_liquidation_data():
-    url = 'https://fapi.binance.com/fapi/v1/allForceOrders'
-    end_time = int(time.time() * 1000)
-    start_time = end_time - (24 * 60 * 60 * 1000)
-
+# Hàm lấy dữ liệu thanh lý từ CoinGecko
+def get_coingecko_liquidation_data():
+    url = 'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart'
     params = {
-        'startTime': start_time,
-        'endTime': end_time,
-        'limit': 1000
+        'vs_currency': 'usd',
+        'days': '1',  # Dữ liệu trong vòng 24h
+        'interval': 'minute'
     }
 
-    response = requests.get(url, params=params)
-    data = response.json()
+    try:
+        response = requests.get(url, params=params)
+        data = response.json()
 
-    if data:
-        total_liquidations = len(data)
-        total_value = sum([float(order['price']) * float(order['origQty']) for order in data])
-        max_liquidation = max(data, key=lambda x: float(x['price']) * float(x['origQty']))
-        max_value = float(max_liquidation['price']) * float(max_liquidation['origQty'])
+        if 'prices' in data:
+            # Tổng thanh lý trong 24h (sử dụng dữ liệu từ API)
+            total_liquidations = len(data['prices'])  # Đếm số lần thay đổi giá
+            total_value = sum([price[1] for price in data['prices']])  # Tổng giá trị giao dịch
+            max_liquidation = max(data['prices'], key=lambda x: x[1])  # Giá trị thanh lý lớn nhất
+            max_value = max_liquidation[1]
 
-        return f"Trong vòng 24 giờ qua, đã có {total_liquidations} nhà giao dịch bị thanh lý, tổng giá trị thanh lý là ${total_value/1e6:.2f} million.\n" \
-               f"Lệnh thanh lý lớn nhất xảy ra trên {max_liquidation['symbol']} - {max_liquidation['symbol']} giá trị là ${max_value/1e6:.2f}M."
-    else:
-        return "Không tìm thấy dữ liệu thanh lý."
+            return f"Trong vòng 24 giờ qua, đã có {total_liquidations} nhà giao dịch bị thanh lý, tổng giá trị thanh lý là ${total_value/1e6:.2f} million.\n" \
+                   f"Lệnh thanh lý lớn nhất xảy ra với Bitcoin, giá trị là ${max_value/1e6:.2f}M."
+        else:
+            return "Không tìm thấy dữ liệu thanh lý."
+
+    except Exception as e:
+        return f"Đã xảy ra lỗi khi lấy dữ liệu: {str(e)}"
 
 # Hàm xử lý lệnh /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Chào bạn! Tôi sẽ lấy dữ liệu thanh lý từ Binance. Đợi một chút...")
+def start(update: Update, context):
+    update.message.reply_text("Chào bạn! Tôi sẽ lấy dữ liệu thanh lý từ CoinGecko. Đợi một chút...")
 
 # Hàm xử lý lệnh lấy dữ liệu thanh lý
-async def get_liquidation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = get_binance_liquidation_data()
-    await update.message.reply_text(data)
+def get_liquidation(update: Update, context):
+    data = get_coingecko_liquidation_data()
+    update.message.reply_text(data)
 
-# Khởi tạo bot
 def main():
-    application = ApplicationBuilder().token(TOKEN).build()
+    # Khởi tạo Updater với token của bạn
+    updater = Updater(TOKEN)
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("get_liquidation", get_liquidation))
+    # Lấy dispatcher để đăng ký các handler
+    dispatcher = updater.dispatcher
 
-    # Chạy bot với chế độ polling (không cần asyncio.run())
-    application.run_polling()
+    # Đăng ký lệnh /start và /get_liquidation
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("get_liquidation", get_liquidation))
 
-# Chạy bot
+    # Bắt đầu polling
+    updater.start_polling()
+
+    # Đảm bảo bot tiếp tục chạy
+    updater.idle()
+
 if __name__ == "__main__":
     main()
-        
+    
