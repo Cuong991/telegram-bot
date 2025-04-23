@@ -1,72 +1,56 @@
-import logging
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+import requests
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import time
 
-# Logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
 
-TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token vào
+# Hàm lấy dữ liệu thanh lý từ Binance
+def get_binance_liquidation_data():
+    url = 'https://fapi.binance.com/fapi/v1/allForceOrders'
+    end_time = int(time.time() * 1000)
+    start_time = end_time - (24 * 60 * 60 * 1000)
 
+    params = {
+        'startTime': start_time,
+        'endTime': end_time,
+        'limit': 1000
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    if data:
+        total_liquidations = len(data)
+        total_value = sum([float(order['price']) * float(order['origQty']) for order in data])
+        max_liquidation = max(data, key=lambda x: float(x['price']) * float(x['origQty']))
+        max_value = float(max_liquidation['price']) * float(max_liquidation['origQty'])
+
+        return f"Trong vòng 24 giờ qua, đã có {total_liquidations} nhà giao dịch bị thanh lý, tổng giá trị thanh lý là ${total_value/1e6:.2f} million.\n" \
+               f"Lệnh thanh lý lớn nhất xảy ra trên {max_liquidation['symbol']} - {max_liquidation['symbol']} giá trị là ${max_value/1e6:.2f}M."
+    else:
+        return "Không tìm thấy dữ liệu thanh lý."
+
+# Hàm xử lý lệnh /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("Lấy dữ liệu thanh lý mới nhất", callback_data='get_liquidation')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Chào bạn! Bấm nút bên dưới để lấy dữ liệu:', reply_markup=reply_markup)
+    await update.message.reply_text("Chào bạn! Tôi sẽ lấy dữ liệu thanh lý từ Binance. Đợi một chút...")
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+# Hàm xử lý lệnh lấy dữ liệu thanh lý
+async def get_liquidation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = get_binance_liquidation_data()
+    await update.message.reply_text(data)
 
-    if query.data == 'get_liquidation':
-        await query.edit_message_text(text="Đang lấy dữ liệu mới nhất, vui lòng chờ...")
+# Khởi tạo bot
+async def main():
+    application = ApplicationBuilder().token(TOKEN).build()
 
-        data = await get_liquidation_data()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("get_liquidation", get_liquidation))
 
-        await query.edit_message_text(text=data)
+    await application.run_polling()
 
-# Dùng Selenium để lấy dữ liệu thanh lý từ trang web
-def get_liquidation_data():
-    url = "https://www.coinglass.com/vi/LiquidationData"
-
-    try:
-        # Cấu hình và khởi tạo WebDriver (Chrome)
-        options = webdriver.ChromeOptions()
-        options.add_argument('--headless')  # Chạy Chrome ở chế độ không hiển thị giao diện (headless)
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-
-        # Tạo WebDriver
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-
-        # Mở trang web
-        driver.get(url)
-
-        # Chờ trang web tải xong
-        time.sleep(5)  # Chờ 5 giây để dữ liệu tải đầy đủ
-
-        # Tìm và lấy nội dung thanh lý
-        try:
-            # Lấy phần chứa thông tin thanh lý
-            liquidation_section = driver.find_element(By.CSS_SELECTOR, 'div.index_title__x6mnK')
-            liquidation_text = liquidation_section.text
-        except Exception as e:
-            liquidation_text = f"Không thể lấy dữ liệu thanh lý: {e}"
-
-        driver.quit()
-        return liquidation_text
-
-    except Exception as e:
-        return f"Đã xảy ra lỗi: {e}"
-
-if __name__ == '__main__':
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler('start', start))
-    app.add_handler(CallbackQueryHandler(button))
-
-    app.run_polling()
-        
+# Chạy bot
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+    
