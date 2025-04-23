@@ -1,13 +1,13 @@
 import logging
-import aiohttp
-import datetime
+import httpx
+from selectolax.parser import HTMLParser
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token của bạn vào
+TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token của bạn vào đây
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Lấy dữ liệu thanh lý mới nhất", callback_data='get_liquidation')]]
@@ -26,52 +26,26 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text=data)
 
 async def get_liquidation_data():
-    url = "https://fapi.binance.com/fapi/v1/allForceOrders"
-
-    now = datetime.datetime.utcnow()
-    past = now - datetime.timedelta(hours=24)
-
-    params = {
-        "startTime": int(past.timestamp() * 1000),
-        "endTime": int(now.timestamp() * 1000),
-        "limit": 1000  # Binance tối đa 1000 lệnh mỗi lần
-    }
+    url = "https://www.coinglass.com/vi/LiquidationData"
 
     headers = {
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0",
+        "Accept-Language": "vi-VN,vi;q=0.9",
     }
 
     try:
-        total_traders = 0
-        total_value = 0
-        largest_liquidation = 0
-        largest_symbol = ""
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, params=params) as response:
-                data = await response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            html = HTMLParser(response.text)
 
-                if isinstance(data, list):
-                    for order in data:
-                        total_traders += 1
-                        value = float(order['price']) * float(order['origQty'])
-                        total_value += value
+            # Tìm đến đoạn chứa dữ liệu
+            liquidation_info = html.css_first('div.index_title__x6mnK')  # Cái div chứa nội dung cần lấy
 
-                        if value > largest_liquidation:
-                            largest_liquidation = value
-                            largest_symbol = order['symbol']
+            if liquidation_info:
+                return liquidation_info.text()
+            else:
+                return "Không tìm thấy dữ liệu thanh lý."
 
-                    if total_traders == 0:
-                        return "Không có lệnh thanh lý nào trong 24 giờ qua."
-
-                    text = (
-                        f"Trong vòng 24 giờ qua, đã có {total_traders:,} lệnh thanh lý, "
-                        f"tổng giá trị thanh lý là ${total_value/1_000_000:.2f}M.\n"
-                        f"Lệnh thanh lý lớn nhất: {largest_symbol} trị giá ${largest_liquidation/1_000_000:.2f}M."
-                    )
-                    return text
-                else:
-                    return "Không thể lấy dữ liệu từ Binance."
     except Exception as e:
         return f"Đã xảy ra lỗi: {e}"
 
@@ -82,4 +56,4 @@ if __name__ == '__main__':
     app.add_handler(CallbackQueryHandler(button))
 
     app.run_polling()
-    
+                
