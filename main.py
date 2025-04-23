@@ -1,6 +1,6 @@
 import requests
 from telegram import Update
-from telegram.ext import Updater, CommandHandler
+from telegram.ext import Application, CommandHandler
 import time
 
 TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'
@@ -34,30 +34,24 @@ def get_coingecko_liquidation_data():
         return f"Đã xảy ra lỗi khi lấy dữ liệu: {str(e)}"
 
 # Hàm xử lý lệnh /start
-def start(update: Update, context):
-    update.message.reply_text("Chào bạn! Tôi sẽ lấy dữ liệu thanh lý từ CoinGecko. Đợi một chút...")
+async def start(update: Update, context):
+    await update.message.reply_text("Chào bạn! Tôi sẽ lấy dữ liệu thanh lý từ CoinGecko. Đợi một chút...")
 
 # Hàm xử lý lệnh lấy dữ liệu thanh lý
-def get_liquidation(update: Update, context):
+async def get_liquidation(update: Update, context):
     data = get_coingecko_liquidation_data()
-    update.message.reply_text(data)
+    await update.message.reply_text(data)
 
 def main():
-    # Khởi tạo Updater với token của bạn
-    updater = Updater(TOKEN)
+    # Khởi tạo Application với token của bạn
+    application = Application.builder().token(TOKEN).build()
 
-    # Lấy dispatcher để đăng ký các handler
-    dispatcher = updater.dispatcher
+    # Đăng ký các handler
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("get_liquidation", get_liquidation))
 
-    # Đăng ký lệnh /start và /get_liquidation
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("get_liquidation", get_liquidation))
-
-    # Bắt đầu polling
-    updater.start_polling()
-
-    # Đảm bảo bot tiếp tục chạy
-    updater.idle()
+    # Bắt đầu bot
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
