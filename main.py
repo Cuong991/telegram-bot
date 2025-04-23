@@ -41,16 +41,16 @@ async def get_liquidation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(data)
 
 # Khởi tạo bot
-async def main():
+def main():
     application = ApplicationBuilder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("get_liquidation", get_liquidation))
 
-    await application.run_polling()
+    # Chạy bot với chế độ polling (không cần asyncio.run())
+    application.run_polling()
 
 # Chạy bot
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
-    
+    main()
+        
