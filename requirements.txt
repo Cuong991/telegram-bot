@@ -5,3 +5,4 @@ pytz
 Pillow
 selenium
 html2image
+webdriver-manager
