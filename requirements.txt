@@ -7,3 +7,5 @@ selenium
 html2image
 webdriver-manager
 aiohttp
+httpx
+selectolax
