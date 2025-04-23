@@ -1,18 +1,12 @@
 import logging
-import asyncio
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+import aiohttp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token của bạn vào đây
+TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token Telegram bot bạn vào đây
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Lấy dữ liệu thanh lý mới nhất", callback_data='get_liquidation')]]
@@ -24,43 +18,44 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == 'get_liquidation':
-        # Thông báo chờ
         await query.edit_message_text(text="Đang lấy dữ liệu mới nhất, vui lòng chờ...")
 
-        # Lấy dữ liệu từ website
-        data = await asyncio.to_thread(scrape_liquidation_data)
+        data = await get_liquidation_data()
 
-        # Gửi dữ liệu lấy được
         await query.edit_message_text(text=data)
 
-def scrape_liquidation_data():
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--window-size=1920,1080')
+async def get_liquidation_data():
+    url = "https://fapi.coinglass.com/api/futures/liquidation_chart?timeType=24h"
 
-    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+    headers = {
+        "origin": "https://www.coinglass.com",
+        "referer": "https://www.coinglass.com/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+    }
 
     try:
-        driver.get('https://www.coinglass.com/vi/LiquidationData')
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                result = await response.json()
 
-        # Đợi tối đa 15 giây cho đến khi phần tử có nội dung xuất hiện
-        wait = WebDriverWait(driver, 15)
-        container = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'index_lqData__il52W')))
+                if result.get("success"):
+                    total_liquidation = result["data"]["totalVolUsd"]
+                    total_traders = result["data"]["totalLiquidated"]
+                    largest_liq = result["data"]["maxSingleLiquidation"]
+                    largest_exchange = result["data"]["maxSingleLiquidationExchange"]
+                    largest_symbol = result["data"]["maxSingleLiquidationSymbol"]
 
-        data_text = container.text
-
-        # Chỉ lấy đoạn văn bản chính cần thiết
-        if data_text:
-            return f"Dữ liệu thanh lý mới nhất:\n\n{data_text}"
-        else:
-            return "Không tìm thấy dữ liệu thanh lý. Có thể website thay đổi giao diện?"
-
+                    text = (
+                        f"Trong vòng 24 giờ qua, đã có {total_traders:,} nhà giao dịch bị thanh lý, "
+                        f"tổng giá trị thanh lý là ${total_liquidation/1_000_000:.2f}M.\n"
+                        f"Lệnh thanh lý lớn nhất xảy ra trên {largest_exchange} - {largest_symbol} "
+                        f"giá trị là ${largest_liq/1_000_000:.2f}M."
+                    )
+                    return text
+                else:
+                    return "Không thể lấy dữ liệu từ Coinglass. Có thể API thay đổi?"
     except Exception as e:
         return f"Đã xảy ra lỗi: {e}"
-    finally:
-        driver.quit()
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
@@ -69,4 +64,4 @@ if __name__ == '__main__':
     app.add_handler(CallbackQueryHandler(button))
 
     app.run_polling()
-            
+    
