@@ -44,16 +44,14 @@ async def get_liquidation_data():
             # Chờ đợi một chút để website load đủ (delay 5s)
             await asyncio.sleep(5)
 
-            # Tìm đến đoạn text chứa dữ liệu thanh lý
-            all_text_nodes = html.css('body *')
+            # Tìm đúng phần chứa dữ liệu thanh lý
+            data_section = html.css_first('div.index_title__x6mnK')  # Chúng ta phải tìm đúng div chứa thông tin
 
-            for node in all_text_nodes:
-                text = node.text(strip=True)
-                if text and "trong vòng 24 giờ qua" in text.lower():
-                    # Cắt lại đoạn text chính xác để gửi về cho người dùng
-                    return text
-
-            return "Không tìm thấy dữ liệu thanh lý."
+            if data_section:
+                # Trả về chỉ phần có nội dung thanh lý
+                return data_section.text(strip=True)
+            else:
+                return "Không tìm thấy dữ liệu thanh lý."
 
     except Exception as e:
         return f"Đã xảy ra lỗi: {e}"
@@ -65,4 +63,4 @@ if __name__ == '__main__':
     app.add_handler(CallbackQueryHandler(button))
 
     app.run_polling()
-    
+            
