@@ -7,7 +7,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 # Logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token của bạn vào đây
+TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- Thay token vào
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Lấy dữ liệu thanh lý mới nhất", callback_data='get_liquidation')]]
@@ -38,13 +38,15 @@ async def get_liquidation_data():
             response = await client.get(url, headers=headers)
             html = HTMLParser(response.text)
 
-            # Tìm đến đoạn chứa dữ liệu
-            liquidation_info = html.css_first('div.index_title__x6mnK')  # Cái div chứa nội dung cần lấy
+            # Tìm tất cả text trong trang
+            all_text_nodes = html.css('body *')
 
-            if liquidation_info:
-                return liquidation_info.text()
-            else:
-                return "Không tìm thấy dữ liệu thanh lý."
+            for node in all_text_nodes:
+                text = node.text(strip=True)
+                if text and "trong vòng 24 giờ qua" in text.lower():
+                    return text
+
+            return "Không tìm thấy dữ liệu thanh lý."
 
     except Exception as e:
         return f"Đã xảy ra lỗi: {e}"
@@ -56,4 +58,4 @@ if __name__ == '__main__':
     app.add_handler(CallbackQueryHandler(button))
 
     app.run_polling()
-                
+        
