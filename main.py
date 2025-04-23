@@ -1,87 +1,159 @@
-import logging
-import time
 import os
-from io import BytesIO
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+import nest_asyncio
+import asyncio
+import datetime
+import pytz
 
-# === Config ===
-TOKEN = '7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk'  # <-- thay bằng token bot của bạn
-SCREENSHOT_API = 'https://image.thum.io/get/fullpage/https://www.coinglass.com/vi/pro/i/FearGreedIndex'
+# Token của bạn
+TOKEN = "7804124843:AAGIrk9aIOZ9cfjrf0jhsOTZCCUoKHEgHLk"
 
-# === Setup logging ===
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-
-# === Chụp ảnh màn hình trang web Fear & Greed Index ===
-def screenshot_feargreed():
+# Hàm lấy dữ liệu Fear & Greed Index
+def get_fear_and_greed():
     try:
-        # Khởi tạo Selenium với Chrome WebDriver
-        options = Options()
-        options.add_argument("--headless")  # Chạy không giao diện
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.binary_location = '/usr/bin/chromium'  # Dùng Chrome được cài trong Docker
+        url = "https://api.alternative.me/fng/"
+        response = requests.get(url)
+        data = response.json()
 
-        driver = webdriver.Chrome(executable_path="/usr/bin/chromedriver", options=options)
-
-        # Truy cập trang web Fear & Greed Index
-        driver.get("https://www.coinglass.com/vi/pro/i/FearGreedIndex")
-        time.sleep(3)  # Đợi trang web tải xong
-
-        # Lưu ảnh chụp màn hình
-        screenshot = driver.get_screenshot_as_png()
-        driver.quit()
-
-        # Mở ảnh đã chụp
-        img_byte_arr = BytesIO(screenshot)
-        img_byte_arr.seek(0)
-
-        return img_byte_arr
+        value = int(data['data'][0]['value'])
+        return value
     except Exception as e:
-        print(f"Error in screenshot_feargreed: {e}")
-        raise e
+        print(f"Lỗi khi lấy Fear & Greed Index: {e}")
+        return None
 
-# === Start command ===
+# Hàm lấy thời gian hiện tại ở Việt Nam + xác định quý
+def get_vietnam_time():
+    vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+    now = datetime.datetime.now(vn_tz)
+    month = now.month
+
+    if 1 <= month <= 3:
+        quarter = "Quý 1"
+    elif 4 <= month <= 6:
+        quarter = "Quý 2"
+    elif 7 <= month <= 9:
+        quarter = "Quý 3"
+    else:
+        quarter = "Quý 4"
+
+    formatted_time = now.strftime(f"%H:%M - %d/%m/%Y ({quarter})")
+    return formatted_time
+
+# Hàm chuyển chỉ số thành tiếng Việt
+def get_status_text(value):
+    if value <= 24:
+        return "Sợ hãi tột độ🔴"
+    elif 25 <= value <= 49:
+        return "Sợ hãi🟠"
+    elif 50 <= value <= 54:
+        return "Trung lập🔵"
+    elif 55 <= value <= 74:
+        return "Tham lam🟢"
+    else:
+        return "Tham lam tột độ🟢⚡"
+
+# Hàm lấy Bitcoin và Altcoin Dominance từ CoinGecko API
+def get_dominance_data():
+    try:
+        url = "https://api.coingecko.com/api/v3/global"
+        response = requests.get(url)
+        data = response.json()
+
+        btc_dominance = data['data']['market_cap_percentage']['btc']
+        altcoin_dominance = 100 - btc_dominance
+
+        return round(btc_dominance, 2), round(altcoin_dominance, 2)
+    except Exception as e:
+        print(f"Lỗi khi lấy dữ liệu Dominance: {e}")
+        return None, None
+
+# Khi gõ /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("Xem chỉ số tham lam và sợ hãi", callback_data='fear_greed')]
+        [InlineKeyboardButton("Chỉ số Tham lam & Sợ hãi Crypto", callback_data="check_fear_greed")],
+        [InlineKeyboardButton("Chỉ số Bitcoin Dominance & Altcoin", callback_data="check_dominance")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Chào bạn! Chọn chức năng bên dưới:', reply_markup=reply_markup)
+    await update.message.reply_text("⭐Chọn chức năng thực hiện⭐: More to come soon!", reply_markup=reply_markup)
 
-# === Handle button press ===
+# Khi gõ /help
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = (
+        "Các lệnh hỗ trợ:\n\n"
+        "/start - Bắt đầu sử dụng bot\n"
+        "/help - Xem hướng dẫn các lệnh\n\n"
+        "👉 Developed by @cuong49"
+    )
+    await update.message.reply_text(help_text)
+
+# Khi bấm nút
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    if query.data == 'fear_greed':
-        # Chụp ảnh màn hình trang web
-        try:
-            img_byte_arr = screenshot_feargreed()
-            await query.message.reply_photo(
-                photo=img_byte_arr,
-                caption="Đây là Chỉ số Tham Lam và Sợ Hãi hiện tại. Hãy xem chi tiết trong ảnh!"
-            )
-        except Exception as e:
-            print(f"Error: {e}")
-            await query.message.reply_text('Không thể lấy ảnh, vui lòng thử lại sau.')
+    chat_id = query.message.chat_id
 
-# === Main function ===
-def main():
+    if query.data == "check_fear_greed":
+        value = get_fear_and_greed()
+        if value is not None:
+            status_text = get_status_text(value)
+            vietnam_time = get_vietnam_time()
+            message = (
+                f">>Chỉ số Tham lam & Sợ hãi hiện tại: 👉 <b>{value}</b>\n\n"
+                f"Thời gian: {vietnam_time}\n\n"
+                f"- <b>Trạng thái:</b> {status_text}\n\n"
+                f"🔴 = sợ hãi tột độ\n"
+                f"🟠 = sợ hãi\n"
+                f"🔵 = trung lập\n"
+                f"🟢 = tham lam\n"
+                f"🟢⚡ = tham lam tột độ\n\n"
+                f"<b>Developed by</b>: @cuong49"
+            )
+        else:
+            message = "Không thể lấy dữ liệu chỉ số. Vui lòng thử lại sau."
+
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
+
+    elif query.data == "check_dominance":
+        btc_dominance, altcoin_dominance = get_dominance_data()
+        if btc_dominance is not None:
+            vietnam_time = get_vietnam_time()
+
+            # Dự đoán khả năng Altcoin Season với emoji
+            if altcoin_dominance < 45:
+                season_chance = "Thấp 🔻"
+            elif 45 <= altcoin_dominance < 55:
+                season_chance = "Trung bình ⚖️"
+            elif 55 <= altcoin_dominance < 65:
+                season_chance = "Khả năng sắp diễn ra cao 🚀"
+            else:
+                season_chance = "Altcoin season đang diễn ra 🌟"
+
+            message = (
+                f">>Chỉ số Bitcoin Dominance hiện tại: 👉 <b>{btc_dominance}%</b>\n\n"
+                f"Chỉ số Altcoin Dominance hiện tại: 👉 <b>{altcoin_dominance}%</b>\n\n"
+                f"Thời gian: {vietnam_time}\n\n"
+                f"Khả năng altcoin season diễn ra: <b>{season_chance}</b>\n\n"
+                f"- <b>Ghi chú:</b> Chỉ số Altcoin Dominance càng cao thì khả năng Altcoin Season càng mạnh.\n\n"
+                f"<b>Developed by</b>: @cuong49"
+            )
+        else:
+            message = "Không thể lấy dữ liệu Dominance. Vui lòng thử lại sau."
+
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
+
+async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Thêm các handler cho các lệnh và nút bấm
-    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(button))
 
-    # Bắt đầu bot và lắng nghe sự kiện
-    app.run_polling()
+    await app.run_polling()
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    nest_asyncio.apply()
+    asyncio.run(main())
     
